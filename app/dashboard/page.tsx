@@ -81,11 +81,20 @@ export default async function Dashboard({
             <div className="flex justify-between">
               <div>
                 <p className="font-semibold">
-                  {appt.practitioner_name}
-                </p>
-                <p className="text-sm text-gray-600">
-                  {appt.scheduled.toLocaleString()}
-                </p>
+  {appt.service_name}
+</p>
+
+<p className="text-sm">
+  {appt.client_name}
+</p>
+
+<p className="text-sm text-gray-600">
+  {appt.practitioner_name}
+</p>
+
+<p className="text-sm text-gray-500">
+  {appt.scheduled.toLocaleString()}
+</p>
               </div>
 
               <div>
