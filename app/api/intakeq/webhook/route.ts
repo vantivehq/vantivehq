@@ -9,10 +9,9 @@ const supabase = createClient(
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-
     console.log("Webhook received:", body)
 
-    // 🔹 Get clinic
+    // 🔹 Get clinic (single clinic assumption for now)
     const { data: clinic } = await supabase
       .from("clinics")
       .select("id")
@@ -39,11 +38,15 @@ export async function POST(req: Request) {
             clinic_id: clinic.id,
             intakeq_appointment_id: appt.Id,
             intakeq_client_id: appt.ClientId?.toString(),
+
+            // 👇 External IntakeQ practitioner ID
+            intakeq_practitioner_id: appt.PractitionerId,
+
             practitioner_name: appt.PractitionerName,
-            practitioner_id: appt.PractitionerId,
             client_name: appt.ClientName,
             service_name: appt.ServiceName,
             location_name: appt.LocationName,
+
             status: appt.Status,
             scheduled_start: appt.StartDateIso,
             note_completed: false,
@@ -90,7 +93,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // ✅ Always return a response
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Webhook error:", error)
