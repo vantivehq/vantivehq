@@ -27,22 +27,31 @@ export async function POST(req: Request) {
     // 🗓 APPOINTMENT CREATED
     // ==========================
     if (body.EventType === "AppointmentCreated" && body.Appointment) {
-      const appt = body.Appointment
+  const appt = body.Appointment
 
-      const { error } = await supabase.from("appointments").insert({
-        clinic_id: clinic.id,
-        intakeq_appointment_id: appt.Id,
-        intakeq_client_id: appt.ClientId?.toString(),
-        practitioner_name: appt.PractitionerName,
-        status: appt.Status,
-        scheduled_start: appt.StartDateIso,
-        note_completed: false,
-      })
+  const { error } = await supabase
+    .from("appointments")
+    .upsert({
+      clinic_id: clinic.id,
+      intakeq_appointment_id: appt.Id,
+      intakeq_client_id: appt.ClientId?.toString(),
+      practitioner_name: appt.PractitionerName,
+      practitioner_id: appt.PractitionerId,
+      client_name: appt.ClientName,
+      service_name: appt.ServiceName,
+      location_name: appt.LocationName,
+      status: appt.Status,
+      scheduled_start: appt.StartDateIso,
+      note_completed: false,
+      updated_at: new Date().toISOString(),
+    }, {
+      onConflict: "intakeq_appointment_id"
+    })
 
-      if (error) {
-        console.error("Insert appointment error:", error)
-      }
-    }
+  if (error) {
+    console.error("Insert appointment error:", error)
+  }
+}
 
     // ==========================
     // 📝 NOTE LOCKED
