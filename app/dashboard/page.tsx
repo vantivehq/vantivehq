@@ -73,14 +73,22 @@ export default function Dashboard() {
           </Link>
 
           {/* HR Portal Placeholder */}
-          <div className="bg-white p-8 rounded-2xl shadow-md border border-gray-200 opacity-70">
-            <h2 className="text-xl font-semibold mb-4">
-              HR Portal
-            </h2>
-            <p className="text-gray-500 text-sm">
-              Coming soon.
-            </p>
-          </div>
+          <Link
+  href="/hr"
+  className="bg-white p-8 rounded-2xl shadow-md border border-gray-200 hover:shadow-lg transition"
+>
+  <h2 className="text-xl font-semibold mb-4">
+    HR Portal
+  </h2>
+
+  <p className="text-gray-700 font-medium">
+    Manage staff profiles & compliance
+  </p>
+
+  <p className="text-gray-500 text-sm mt-4">
+    Licenses, documents, expiration tracking.
+  </p>
+</Link>
 
           {/* Med Orders Placeholder */}
           <div className="bg-white p-8 rounded-2xl shadow-md border border-gray-200 opacity-70">
