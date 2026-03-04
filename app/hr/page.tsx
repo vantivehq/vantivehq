@@ -14,81 +14,105 @@ type Staff = {
   name: string
   role: string
   status: string
-  license_expiration: string | null
+  intakeq_practitioner_id: string | null
 }
 
 export default function HRPage() {
   const [staff, setStaff] = useState<Staff[]>([])
 
+  const fetchStaff = async () => {
+    const { data } = await supabase
+      .from("staff")
+      .select("*")
+      .order("created_at", { ascending: false })
+
+    if (data) setStaff(data as Staff[])
+  }
+
   useEffect(() => {
-    const fetchStaff = async () => {
-      const { data } = await supabase
-        .from("staff")
-        .select("*")
-        .order("created_at", { ascending: false })
-
-      if (data) setStaff(data as Staff[])
-    }
-
     fetchStaff()
   }, [])
 
-  const today = new Date()
+  const syncFromAppointments = async () => {
+    const { data: appts } = await supabase
+      .from("appointments")
+      .select("practitioner_id, practitioner_name")
+      .not("practitioner_id", "is", null)
+
+    if (!appts) return
+
+    const uniqueMap = new Map()
+
+    appts.forEach((a: any) => {
+      if (a.practitioner_id) {
+        uniqueMap.set(a.practitioner_id, {
+          intakeq_practitioner_id: a.practitioner_id,
+          name: a.practitioner_name,
+          role: "Unassigned",
+          status: "Active",
+        })
+      }
+    })
+
+    const practitioners = Array.from(uniqueMap.values())
+
+    for (const p of practitioners) {
+      await supabase
+        .from("staff")
+        .upsert(p, {
+          onConflict: "intakeq_practitioner_id",
+        })
+    }
+
+    fetchStaff()
+  }
 
   return (
     <div className="space-y-8">
 
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-semibold">HR Portal</h1>
-        <Link
-          href="/hr/new"
-          className="bg-[#6B8E6B] text-white px-4 py-2 rounded-lg shadow hover:opacity-90"
-        >
-          + Add Staff
-        </Link>
+
+        <div className="flex gap-4">
+          <button
+            onClick={syncFromAppointments}
+            className="bg-[#6B8E6B] text-white px-4 py-2 rounded-lg shadow hover:opacity-90"
+          >
+            Sync From Appointments
+          </button>
+
+          <Link
+            href="/hr/new"
+            className="bg-gray-800 text-white px-4 py-2 rounded-lg shadow hover:opacity-90"
+          >
+            + Add Staff
+          </Link>
+        </div>
       </div>
 
       <div className="space-y-4">
-        {staff.map((member) => {
-          const expiration =
-            member.license_expiration
-              ? new Date(member.license_expiration)
-              : null
-
-          const isExpiring =
-            expiration &&
-            expiration.getTime() - today.getTime() <
-              30 * 24 * 60 * 60 * 1000
-
-          return (
-            <Link
-              key={member.id}
-              href={`/hr/${member.id}`}
-              className={`block bg-white p-5 rounded-xl shadow-sm border hover:shadow-md transition ${
-                isExpiring
-                  ? "border-red-400 bg-red-50"
-                  : "border-gray-200"
-              }`}
-            >
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="font-semibold text-lg">
-                    {member.name}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    {member.role}
-                  </p>
-                </div>
-
-                <div className="text-sm">
-                  {isExpiring
-                    ? "License Expiring Soon"
-                    : member.status}
-                </div>
+        {staff.map((member) => (
+          <Link
+            key={member.id}
+            href={`/hr/${member.id}`}
+            className="block bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition"
+          >
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="font-semibold text-lg">
+                  {member.name}
+                </p>
+                <p className="text-sm text-gray-600">
+                  {member.role}
+                </p>
               </div>
-            </Link>
-          )
-        })}
+
+              <div className="text-sm">
+                {member.status}
+              </div>
+            </div>
+          </Link>
+        ))}
       </div>
 
     </div>
