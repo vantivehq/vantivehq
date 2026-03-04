@@ -26,22 +26,28 @@ export default function Dashboard() {
   }, [])
 
   const now = new Date()
+  const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000)
   const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
 
   const enriched = appointments.map((appt) => {
     const scheduled = new Date(appt.scheduled_start)
 
-    const isOverdue =
-      !appt.note_completed && scheduled < twentyFourHoursAgo
+    let urgency: "critical" | "high" | "medium" | "future" | "completed" = "future"
 
-    const isToday =
-      scheduled.toDateString() === now.toDateString()
+    if (appt.note_completed) {
+      urgency = "completed"
+    } else if (scheduled < twentyFourHoursAgo) {
+      urgency = "critical"
+    } else if (scheduled < twelveHoursAgo) {
+      urgency = "high"
+    } else if (scheduled.toDateString() === now.toDateString()) {
+      urgency = "medium"
+    }
 
     return {
       ...appt,
       scheduled,
-      isOverdue,
-      isToday,
+      urgency,
     }
   })
 
@@ -51,37 +57,41 @@ export default function Dashboard() {
       )
     : enriched
 
-  const overdueCount = enriched.filter((a) => a.isOverdue).length
-  const todayCount = enriched.filter(
-    (a) => a.isToday && !a.note_completed
-  ).length
-  const completedCount = enriched.filter(
-    (a) => a.note_completed
-  ).length
-
-  const completionRate =
-    enriched.length > 0
-      ? Math.round(
-          (completedCount / enriched.length) * 100
-        )
-      : 0
+  const criticalCount = enriched.filter((a) => a.urgency === "critical").length
+  const highCount = enriched.filter((a) => a.urgency === "high").length
+  const mediumCount = enriched.filter((a) => a.urgency === "medium").length
+  const completedCount = enriched.filter((a) => a.urgency === "completed").length
 
   const grouped = enriched.reduce((acc: any, appt) => {
     const name = appt.practitioner_name || "Unknown"
-
     if (!acc[name]) acc[name] = []
-
     acc[name].push(appt)
     return acc
   }, {})
 
   const practitioners = Object.entries(grouped)
 
-  const workQueue = filteredAppointments.sort((a, b) => {
-    if (a.isOverdue && !b.isOverdue) return -1
-    if (!a.isOverdue && b.isOverdue) return 1
-    return a.scheduled.getTime() - b.scheduled.getTime()
-  })
+  const urgencyRank: Record<string, number> = {
+    critical: 1,
+    high: 2,
+    medium: 3,
+    future: 4,
+    completed: 5,
+  }
+
+  const workQueue = filteredAppointments.sort(
+    (a, b) =>
+      urgencyRank[a.urgency] - urgencyRank[b.urgency] ||
+      a.scheduled.getTime() - b.scheduled.getTime()
+  )
+
+  const urgencyStyles: Record<string, string> = {
+    critical: "border-red-500 bg-red-50 text-red-700",
+    high: "border-orange-400 bg-orange-50 text-orange-700",
+    medium: "border-yellow-400 bg-yellow-50 text-yellow-700",
+    future: "border-gray-200 bg-white text-gray-600",
+    completed: "border-green-400 bg-green-50 text-green-700",
+  }
 
   return (
     <main className="min-h-screen bg-gray-100 p-10">
@@ -97,10 +107,10 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-4 gap-6">
-          <StatCard label="24hr+ Overdue" value={overdueCount} color="red" />
-          <StatCard label="Today" value={todayCount} color="yellow" />
+          <StatCard label="24hr+ Critical" value={criticalCount} color="red" />
+          <StatCard label="12–24hr High" value={highCount} color="orange" />
+          <StatCard label="Today Pending" value={mediumCount} color="yellow" />
           <StatCard label="Completed" value={completedCount} color="green" />
-          <StatCard label="Completion %" value={`${completionRate}%`} />
         </div>
 
         {!selectedPractitioner && (
@@ -111,22 +121,18 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-3 gap-6">
               {practitioners.map(([name, appts]: any) => {
-                const overdue = appts.filter((a: any) => a.isOverdue).length
-                const today = appts.filter(
-                  (a: any) =>
-                    a.isToday && !a.note_completed
-                ).length
-                const completed = appts.filter(
-                  (a: any) => a.note_completed
-                ).length
+                const critical = appts.filter((a: any) => a.urgency === "critical").length
+                const high = appts.filter((a: any) => a.urgency === "high").length
 
                 return (
                   <div
                     key={name}
                     onClick={() => setSelectedPractitioner(name as string)}
                     className={`cursor-pointer bg-white p-5 rounded-xl shadow-sm border transition hover:shadow-md ${
-                      overdue > 0
-                        ? "border-red-400"
+                      critical > 0
+                        ? "border-red-500"
+                        : high > 0
+                        ? "border-orange-400"
                         : "border-gray-200"
                     }`}
                   >
@@ -134,17 +140,12 @@ export default function Dashboard() {
                       {name}
                     </h3>
 
-                    <div className="space-y-1 text-sm">
-                      <p className="text-red-600">
-                        {overdue} 24hr+ Overdue
-                      </p>
-                      <p className="text-yellow-600">
-                        {today} Today
-                      </p>
-                      <p className="text-green-600">
-                        {completed} Completed
-                      </p>
-                    </div>
+                    <p className="text-sm text-red-600">
+                      {critical} Critical
+                    </p>
+                    <p className="text-sm text-orange-600">
+                      {high} High
+                    </p>
                   </div>
                 )
               })}
@@ -174,10 +175,8 @@ export default function Dashboard() {
             {workQueue.map((appt: any) => (
               <div
                 key={appt.id}
-                className={`bg-white p-5 rounded-xl shadow-sm border ${
-                  appt.isOverdue
-                    ? "border-red-400 bg-red-50"
-                    : "border-gray-200"
+                className={`p-5 rounded-xl shadow-sm border ${
+                  urgencyStyles[appt.urgency]
                 }`}
               >
                 <div className="flex justify-between items-center">
@@ -185,32 +184,16 @@ export default function Dashboard() {
                     <p className="font-semibold">
                       {appt.service_name}
                     </p>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm">
                       {appt.client_name}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs">
                       {appt.practitioner_name}
                     </p>
                   </div>
 
-                  <div className="text-right">
-                    <p className="text-sm">
-                      {appt.scheduled.toLocaleTimeString()}
-                    </p>
-
-                    {appt.note_completed ? (
-                      <span className="text-green-600 text-sm font-semibold">
-                        Completed
-                      </span>
-                    ) : appt.isOverdue ? (
-                      <span className="text-red-600 text-sm font-semibold">
-                        24hr+ Overdue
-                      </span>
-                    ) : (
-                      <span className="text-yellow-600 text-sm font-semibold">
-                        Pending
-                      </span>
-                    )}
+                  <div className="text-right text-sm font-semibold">
+                    {appt.urgency.toUpperCase()}
                   </div>
                 </div>
               </div>
@@ -230,13 +213,14 @@ function StatCard({
 }: {
   label: string
   value: any
-  color?: "red" | "yellow" | "green"
+  color: "red" | "orange" | "yellow" | "green"
 }) {
   const colorMap: Record<
-    "red" | "yellow" | "green",
+    "red" | "orange" | "yellow" | "green",
     string
   > = {
     red: "text-red-600",
+    orange: "text-orange-600",
     yellow: "text-yellow-600",
     green: "text-green-600",
   }
@@ -244,11 +228,7 @@ function StatCard({
   return (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
       <p className="text-sm text-gray-500">{label}</p>
-      <p
-        className={`text-2xl font-semibold ${
-          color ? colorMap[color] : ""
-        }`}
-      >
+      <p className={`text-2xl font-semibold ${colorMap[color]}`}>
         {value}
       </p>
     </div>
