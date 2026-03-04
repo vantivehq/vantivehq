@@ -34,38 +34,53 @@ export default function HRPage() {
   }, [])
 
   const syncFromAppointments = async () => {
-    const { data: appts } = await supabase
-      .from("appointments")
-      .select("practitioner_id, practitioner_name")
-      .not("practitioner_id", "is", null)
+  console.log("Sync started")
 
-    if (!appts) return
+  const { data: appts, error } = await supabase
+    .from("appointments")
+    .select("practitioner_id, practitioner_name")
+    .not("practitioner_id", "is", null)
 
-    const uniqueMap = new Map()
+  console.log("Appointments:", appts)
+  console.log("Error:", error)
 
-    appts.forEach((a: any) => {
-      if (a.practitioner_id) {
-        uniqueMap.set(a.practitioner_id, {
-          intakeq_practitioner_id: a.practitioner_id,
-          name: a.practitioner_name,
-          role: "Unassigned",
-          status: "Active",
-        })
-      }
+  if (!appts || appts.length === 0) {
+    alert("No practitioners found in appointments.")
+    return
+  }
+
+  const uniqueMap = new Map()
+
+  appts.forEach((a: any) => {
+    uniqueMap.set(a.practitioner_id, {
+      intakeq_practitioner_id: a.practitioner_id,
+      name: a.practitioner_name,
+      role: "Unassigned",
+      status: "Active",
+    })
+  })
+
+  const practitioners = Array.from(uniqueMap.values())
+
+  console.log("Upserting:", practitioners)
+
+  const { error: upsertError } = await supabase
+    .from("staff")
+    .upsert(practitioners, {
+      onConflict: "intakeq_practitioner_id",
     })
 
-    const practitioners = Array.from(uniqueMap.values())
+  console.log("Upsert error:", upsertError)
 
-    for (const p of practitioners) {
-      await supabase
-        .from("staff")
-        .upsert(p, {
-          onConflict: "intakeq_practitioner_id",
-        })
-    }
-
-    fetchStaff()
+  if (upsertError) {
+    alert("Upsert failed — check console.")
+    return
   }
+
+  alert(`Synced ${practitioners.length} staff.`)
+
+  fetchStaff()
+}
 
   return (
     <div className="space-y-8">
