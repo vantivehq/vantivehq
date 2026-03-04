@@ -5,165 +5,202 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-export default async function Dashboard({
-  searchParams,
-}: {
-  searchParams: { filter?: string }
-}) {
+export default async function Dashboard() {
   const { data: appointments } = await supabase
     .from("appointments")
     .select("*")
-    .order("scheduled_start", { ascending: false })
+    .order("scheduled_start", { ascending: true })
 
   const now = new Date()
 
-  const enriched = appointments?.map((appt) => {
+  const enriched = (appointments || []).map((appt) => {
     const scheduled = new Date(appt.scheduled_start)
     const isOverdue =
       !appt.note_completed && scheduled < now
+    const isToday =
+      scheduled.toDateString() === now.toDateString()
 
     return {
       ...appt,
       scheduled,
       isOverdue,
+      isToday,
     }
-  }) ?? []
-
-  const filter = searchParams?.filter || "all"
-
-  const filtered = enriched.filter((appt) => {
-    if (filter === "overdue") return appt.isOverdue
-    if (filter === "pending")
-      return !appt.note_completed && !appt.isOverdue
-    if (filter === "completed") return appt.note_completed
-    return true
   })
 
-  const total = enriched.length
+  // ---- GLOBAL STATS ----
   const overdueCount = enriched.filter((a) => a.isOverdue).length
+  const todayCount = enriched.filter((a) => a.isToday && !a.note_completed).length
   const completedCount = enriched.filter((a) => a.note_completed).length
   const completionRate =
-    total > 0 ? Math.round((completedCount / total) * 100) : 0
+    enriched.length > 0
+      ? Math.round((completedCount / enriched.length) * 100)
+      : 0
+
+  // ---- GROUP BY PRACTITIONER ----
+  const grouped = enriched.reduce((acc: any, appt) => {
+    const name = appt.practitioner_name || "Unknown"
+
+    if (!acc[name]) acc[name] = []
+
+    acc[name].push(appt)
+    return acc
+  }, {})
+
+  const practitioners = Object.entries(grouped)
+
+  // ---- WORK QUEUE SORT ----
+  const workQueue = enriched.sort((a, b) => {
+    if (a.isOverdue && !b.isOverdue) return -1
+    if (!a.isOverdue && b.isOverdue) return 1
+    return a.scheduled.getTime() - b.scheduled.getTime()
+  })
 
   return (
-    <main className="p-8">
-      <h1 className="text-3xl font-bold mb-6">
-        Vantive Dashboard
-      </h1>
+    <main className="min-h-screen bg-gray-100 p-10">
+      <div className="max-w-6xl mx-auto space-y-10">
 
-      {/* 📊 Stats Header */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
-        <StatBox label="Total" value={total} />
-        <StatBox label="Overdue" value={overdueCount} red />
-        <StatBox label="Completed" value={completedCount} green />
-        <StatBox label="Completion %" value={`${completionRate}%`} />
-      </div>
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-semibold">
+            Vantive Operations
+          </h1>
+          <p className="text-gray-500">
+            {now.toLocaleDateString()}
+          </p>
+        </div>
 
-      {/* 🔎 Filters */}
-      <div className="flex gap-4 mb-6">
-        <FilterButton label="All" value="all" active={filter === "all"} />
-        <FilterButton label="Overdue" value="overdue" active={filter === "overdue"} />
-        <FilterButton label="Pending" value="pending" active={filter === "pending"} />
-        <FilterButton label="Completed" value="completed" active={filter === "completed"} />
-      </div>
+        {/* Snapshot */}
+        <div className="grid grid-cols-4 gap-6">
+          <StatCard label="Overdue" value={overdueCount} color="red" />
+          <StatCard label="Today" value={todayCount} color="yellow" />
+          <StatCard label="Completed" value={completedCount} color="green" />
+          <StatCard label="Completion %" value={`${completionRate}%`} />
+        </div>
 
-      {/* 📋 Appointment List */}
-      <div className="space-y-4">
-        {filtered.map((appt) => (
-          <div
-            key={appt.id}
-            className={`p-4 border rounded-lg ${
-              appt.isOverdue
-                ? "border-red-500 bg-red-50"
-                : "border-gray-300"
-            }`}
-          >
-            <div className="flex justify-between">
-              <div>
-                <p className="font-semibold">
-  {appt.service_name}
-</p>
+        {/* Practitioner Grid */}
+        <div>
+          <h2 className="text-xl font-semibold mb-4">
+            Practitioner Accountability
+          </h2>
 
-<p className="text-sm">
-  {appt.client_name}
-</p>
+          <div className="grid grid-cols-3 gap-6">
+            {practitioners.map(([name, appts]: any) => {
+              const overdue = appts.filter((a: any) => a.isOverdue).length
+              const today = appts.filter((a: any) => a.isToday && !a.note_completed).length
+              const completed = appts.filter((a: any) => a.note_completed).length
 
-<p className="text-sm text-gray-600">
-  {appt.practitioner_name}
-</p>
+              return (
+                <div
+                  key={name}
+                  className={`bg-white p-5 rounded-xl shadow-sm border ${
+                    overdue > 0 ? "border-red-400" : "border-gray-200"
+                  }`}
+                >
+                  <h3 className="font-semibold text-lg mb-3">
+                    {name}
+                  </h3>
 
-<p className="text-sm text-gray-500">
-  {appt.scheduled.toLocaleString()}
-</p>
-              </div>
-
-              <div>
-                {appt.note_completed ? (
-                  <span className="text-green-600 font-semibold">
-                    Completed
-                  </span>
-                ) : appt.isOverdue ? (
-                  <span className="text-red-600 font-semibold">
-                    Overdue
-                  </span>
-                ) : (
-                  <span className="text-yellow-600 font-semibold">
-                    Pending
-                  </span>
-                )}
-              </div>
-            </div>
+                  <div className="space-y-1 text-sm">
+                    <p className="text-red-600">
+                      {overdue} Overdue
+                    </p>
+                    <p className="text-yellow-600">
+                      {today} Today
+                    </p>
+                    <p className="text-green-600">
+                      {completed} Completed
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
           </div>
-        ))}
+        </div>
+
+        {/* Work Queue */}
+        <div>
+          <h2 className="text-xl font-semibold mb-4">
+            Work Queue
+          </h2>
+
+          <div className="space-y-4">
+            {workQueue.map((appt: any) => (
+              <div
+                key={appt.id}
+                className={`bg-white p-5 rounded-xl shadow-sm border ${
+                  appt.isOverdue
+                    ? "border-red-400 bg-red-50"
+                    : "border-gray-200"
+                }`}
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="font-semibold">
+                      {appt.service_name}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {appt.client_name}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {appt.practitioner_name}
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="text-sm">
+                      {appt.scheduled.toLocaleTimeString()}
+                    </p>
+                    {appt.note_completed ? (
+                      <span className="text-green-600 text-sm font-semibold">
+                        Completed
+                      </span>
+                    ) : appt.isOverdue ? (
+                      <span className="text-red-600 text-sm font-semibold">
+                        Overdue
+                      </span>
+                    ) : (
+                      <span className="text-yellow-600 text-sm font-semibold">
+                        Pending
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
       </div>
     </main>
   )
 }
 
-function StatBox({
+function StatCard({
   label,
   value,
-  red,
-  green,
+  color,
 }: {
   label: string
   value: any
-  red?: boolean
-  green?: boolean
+  color?: "red" | "yellow" | "green"
 }) {
+  const colorMap: Record<"red" | "yellow" | "green", string> = {
+    red: "text-red-600",
+    yellow: "text-yellow-600",
+    green: "text-green-600",
+  }
+
   return (
-    <div className="p-4 border rounded-lg bg-white">
+    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
       <p className="text-sm text-gray-500">{label}</p>
       <p
-        className={`text-2xl font-bold ${
-          red ? "text-red-600" : green ? "text-green-600" : ""
+        className={`text-2xl font-semibold ${
+          color ? colorMap[color] : ""
         }`}
       >
         {value}
       </p>
     </div>
-  )
-}
-
-function FilterButton({
-  label,
-  value,
-  active,
-}: {
-  label: string
-  value: string
-  active: boolean
-}) {
-  return (
-    <a
-      href={`/dashboard?filter=${value}`}
-      className={`px-4 py-2 rounded border ${
-        active
-          ? "bg-black text-white"
-          : "bg-white text-black"
-      }`}
-    >
-      {label}
-    </a>
   )
 }
