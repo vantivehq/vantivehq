@@ -8,11 +8,10 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-export default async function Dashboard({
-  searchParams,
-}: {
-  searchParams: { practitioner?: string }
-}) {
+export default async function Dashboard(props: any) {
+  const searchParams = props?.searchParams || {}
+  const selectedPractitioner = searchParams.practitioner || null
+
   const { data: appointments } = await supabase
     .from("appointments")
     .select("*")
@@ -37,8 +36,6 @@ export default async function Dashboard({
         isToday,
       }
     }) || []
-
-  const selectedPractitioner = searchParams?.practitioner
 
   const filteredAppointments = selectedPractitioner
     ? enriched.filter(
@@ -247,9 +244,7 @@ function StatCard({
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-      <p className="text-sm text-gray-500">
-        {label}
-      </p>
+      <p className="text-sm text-gray-500">{label}</p>
       <p
         className={`text-2xl font-semibold ${
           color ? colorMap[color] : ""
