@@ -1,41 +1,48 @@
-export const dynamic = "force-dynamic"
+"use client"
 
+import { useEffect, useState } from "react"
 import { createClient } from "@supabase/supabase-js"
-import Link from "next/link"
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-export default async function Dashboard(props: any) {
-  const searchParams = props?.searchParams || {}
-  const selectedPractitioner = searchParams.practitioner || null
+export default function Dashboard() {
+  const [appointments, setAppointments] = useState<any[]>([])
+  const [selectedPractitioner, setSelectedPractitioner] = useState<string | null>(null)
 
-  const { data: appointments } = await supabase
-    .from("appointments")
-    .select("*")
-    .order("scheduled_start", { ascending: true })
+  useEffect(() => {
+    const fetchData = async () => {
+      const { data } = await supabase
+        .from("appointments")
+        .select("*")
+        .order("scheduled_start", { ascending: true })
+
+      setAppointments(data || [])
+    }
+
+    fetchData()
+  }, [])
 
   const now = new Date()
 
-  const enriched =
-    (appointments || []).map((appt) => {
-      const scheduled = new Date(appt.scheduled_start)
+  const enriched = appointments.map((appt) => {
+    const scheduled = new Date(appt.scheduled_start)
 
-      const isOverdue =
-        !appt.note_completed && scheduled < now
+    const isOverdue =
+      !appt.note_completed && scheduled < now
 
-      const isToday =
-        scheduled.toDateString() === now.toDateString()
+    const isToday =
+      scheduled.toDateString() === now.toDateString()
 
-      return {
-        ...appt,
-        scheduled,
-        isOverdue,
-        isToday,
-      }
-    }) || []
+    return {
+      ...appt,
+      scheduled,
+      isOverdue,
+      isToday,
+    }
+  })
 
   const filteredAppointments = selectedPractitioner
     ? enriched.filter(
@@ -43,7 +50,6 @@ export default async function Dashboard(props: any) {
       )
     : enriched
 
-  // ---- GLOBAL STATS ----
   const overdueCount = enriched.filter((a) => a.isOverdue).length
   const todayCount = enriched.filter(
     (a) => a.isToday && !a.note_completed
@@ -59,7 +65,6 @@ export default async function Dashboard(props: any) {
         )
       : 0
 
-  // ---- GROUP BY PRACTITIONER ----
   const grouped = enriched.reduce((acc: any, appt) => {
     const name = appt.practitioner_name || "Unknown"
 
@@ -71,7 +76,6 @@ export default async function Dashboard(props: any) {
 
   const practitioners = Object.entries(grouped)
 
-  // ---- WORK QUEUE SORT ----
   const workQueue = filteredAppointments.sort((a, b) => {
     if (a.isOverdue && !b.isOverdue) return -1
     if (!a.isOverdue && b.isOverdue) return 1
@@ -82,7 +86,6 @@ export default async function Dashboard(props: any) {
     <main className="min-h-screen bg-gray-100 p-10">
       <div className="max-w-6xl mx-auto space-y-10">
 
-        {/* Header */}
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-semibold">
             Vantive Operations
@@ -92,7 +95,6 @@ export default async function Dashboard(props: any) {
           </p>
         </div>
 
-        {/* Snapshot */}
         <div className="grid grid-cols-4 gap-6">
           <StatCard label="Overdue" value={overdueCount} color="red" />
           <StatCard label="Today" value={todayCount} color="yellow" />
@@ -100,7 +102,6 @@ export default async function Dashboard(props: any) {
           <StatCard label="Completion %" value={`${completionRate}%`} />
         </div>
 
-        {/* Practitioner Grid */}
         {!selectedPractitioner && (
           <div>
             <h2 className="text-xl font-semibold mb-4">
@@ -119,12 +120,10 @@ export default async function Dashboard(props: any) {
                 ).length
 
                 return (
-                  <Link
+                  <div
                     key={name}
-                    href={`/dashboard?practitioner=${encodeURIComponent(
-                      name as string
-                    )}`}
-                    className={`block bg-white p-5 rounded-xl shadow-sm border transition hover:shadow-md ${
+                    onClick={() => setSelectedPractitioner(name as string)}
+                    className={`cursor-pointer bg-white p-5 rounded-xl shadow-sm border transition hover:shadow-md ${
                       overdue > 0
                         ? "border-red-400"
                         : "border-gray-200"
@@ -145,14 +144,13 @@ export default async function Dashboard(props: any) {
                         {completed} Completed
                       </p>
                     </div>
-                  </Link>
+                  </div>
                 )
               })}
             </div>
           </div>
         )}
 
-        {/* Work Queue */}
         <div>
           <h2 className="text-xl font-semibold mb-4">
             {selectedPractitioner
@@ -162,12 +160,12 @@ export default async function Dashboard(props: any) {
 
           {selectedPractitioner && (
             <div className="mb-4">
-              <Link
-                href="/dashboard"
+              <button
+                onClick={() => setSelectedPractitioner(null)}
                 className="text-sm text-blue-600 hover:underline"
               >
                 ← Back to All Practitioners
-              </Link>
+              </button>
             </div>
           )}
 
