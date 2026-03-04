@@ -26,12 +26,13 @@ export default function Dashboard() {
   }, [])
 
   const now = new Date()
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
 
   const enriched = appointments.map((appt) => {
     const scheduled = new Date(appt.scheduled_start)
 
     const isOverdue =
-      !appt.note_completed && scheduled < now
+      !appt.note_completed && scheduled < twentyFourHoursAgo
 
     const isToday =
       scheduled.toDateString() === now.toDateString()
@@ -88,7 +89,7 @@ export default function Dashboard() {
 
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-semibold">
-            Vantive Operations
+            Notes Oversight
           </h1>
           <p className="text-gray-500">
             {now.toLocaleDateString()}
@@ -96,7 +97,7 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-4 gap-6">
-          <StatCard label="Overdue" value={overdueCount} color="red" />
+          <StatCard label="24hr+ Overdue" value={overdueCount} color="red" />
           <StatCard label="Today" value={todayCount} color="yellow" />
           <StatCard label="Completed" value={completedCount} color="green" />
           <StatCard label="Completion %" value={`${completionRate}%`} />
@@ -135,7 +136,7 @@ export default function Dashboard() {
 
                     <div className="space-y-1 text-sm">
                       <p className="text-red-600">
-                        {overdue} Overdue
+                        {overdue} 24hr+ Overdue
                       </p>
                       <p className="text-yellow-600">
                         {today} Today
@@ -203,7 +204,7 @@ export default function Dashboard() {
                       </span>
                     ) : appt.isOverdue ? (
                       <span className="text-red-600 text-sm font-semibold">
-                        Overdue
+                        24hr+ Overdue
                       </span>
                     ) : (
                       <span className="text-yellow-600 text-sm font-semibold">
