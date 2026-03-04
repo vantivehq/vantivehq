@@ -14,6 +14,7 @@ export default function StaffProfilePage() {
   const id = params.id as string
 
   const [staff, setStaff] = useState<any>(null)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     const fetchStaff = async () => {
@@ -29,9 +30,31 @@ export default function StaffProfilePage() {
     fetchStaff()
   }, [id])
 
-  if (!staff) {
-    return <div>Loading...</div>
+  const saveChanges = async () => {
+    setSaving(true)
+
+    const { error } = await supabase
+      .from("staff")
+      .update({
+        role: staff.role,
+        phone: staff.phone,
+        email: staff.email,
+        license_number: staff.license_number,
+        license_expiration: staff.license_expiration,
+      })
+      .eq("id", id)
+
+    setSaving(false)
+
+    if (error) {
+      alert("Failed to save")
+      console.error(error)
+    } else {
+      alert("Saved")
+    }
   }
+
+  if (!staff) return <div>Loading...</div>
 
   return (
     <div className="space-y-8 max-w-3xl">
@@ -43,31 +66,88 @@ export default function StaffProfilePage() {
       <div className="bg-white p-8 rounded-xl shadow-sm border space-y-6">
 
         <div>
-          <label className="text-sm text-gray-500">Role</label>
-          <p className="text-lg">{staff.role}</p>
+          <label className="text-sm text-gray-500">
+            Role
+          </label>
+
+          <input
+            value={staff.role || ""}
+            onChange={(e) =>
+              setStaff({ ...staff, role: e.target.value })
+            }
+            className="w-full border rounded px-4 py-2 mt-1"
+          />
         </div>
 
         <div>
-          <label className="text-sm text-gray-500">Phone</label>
-          <p className="text-lg">{staff.phone || "Not set"}</p>
+          <label className="text-sm text-gray-500">
+            Phone
+          </label>
+
+          <input
+            value={staff.phone || ""}
+            onChange={(e) =>
+              setStaff({ ...staff, phone: e.target.value })
+            }
+            className="w-full border rounded px-4 py-2 mt-1"
+          />
         </div>
 
         <div>
-          <label className="text-sm text-gray-500">Email</label>
-          <p className="text-lg">{staff.email || "Not set"}</p>
+          <label className="text-sm text-gray-500">
+            Email
+          </label>
+
+          <input
+            value={staff.email || ""}
+            onChange={(e) =>
+              setStaff({ ...staff, email: e.target.value })
+            }
+            className="w-full border rounded px-4 py-2 mt-1"
+          />
         </div>
 
         <div>
-          <label className="text-sm text-gray-500">License Number</label>
-          <p className="text-lg">{staff.license_number || "Not set"}</p>
+          <label className="text-sm text-gray-500">
+            License Number
+          </label>
+
+          <input
+            value={staff.license_number || ""}
+            onChange={(e) =>
+              setStaff({
+                ...staff,
+                license_number: e.target.value,
+              })
+            }
+            className="w-full border rounded px-4 py-2 mt-1"
+          />
         </div>
 
         <div>
-          <label className="text-sm text-gray-500">License Expiration</label>
-          <p className="text-lg">
-            {staff.license_expiration || "Not set"}
-          </p>
+          <label className="text-sm text-gray-500">
+            License Expiration
+          </label>
+
+          <input
+            type="date"
+            value={staff.license_expiration || ""}
+            onChange={(e) =>
+              setStaff({
+                ...staff,
+                license_expiration: e.target.value,
+              })
+            }
+            className="w-full border rounded px-4 py-2 mt-1"
+          />
         </div>
+
+        <button
+          onClick={saveChanges}
+          className="bg-[#6B8E6B] text-white px-6 py-2 rounded-lg shadow hover:opacity-90"
+        >
+          {saving ? "Saving..." : "Save Changes"}
+        </button>
 
       </div>
 
