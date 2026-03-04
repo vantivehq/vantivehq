@@ -200,13 +200,17 @@ export default function StaffProfilePage() {
                 )}
               </div>
 
-              <input
-                type="file"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) uploadDocument(file, type)
-                }}
-              />
+           <label className="cursor-pointer bg-[#6B8E6B] text-white px-4 py-2 rounded-lg shadow hover:opacity-90">
+  Upload
+  <input
+    type="file"
+    className="hidden"
+    onChange={(e) => {
+      const file = e.target.files?.[0]
+      if (file) uploadDocument(file, type)
+    }}
+  />
+</label>
             </div>
           )
         })}
