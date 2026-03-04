@@ -30,21 +30,28 @@ export default function RootLayout({
 
               <nav className="space-y-3">
 
-                <Link
-                  href="/dashboard"
-                  className="block px-4 py-2 rounded-lg hover:bg-[#EDE3D3] transition font-medium"
-                >
-                  Control Center
-                </Link>
+  <Link
+    href="/dashboard"
+    className="block px-4 py-2 rounded-lg hover:bg-[#EDE3D3] transition font-medium"
+  >
+    Control Center
+  </Link>
 
-                <Link
-                  href="/notes"
-                  className="block px-4 py-2 rounded-lg hover:bg-[#EDE3D3] transition font-medium"
-                >
-                  Notes Oversight
-                </Link>
+  <Link
+    href="/notes"
+    className="block px-4 py-2 rounded-lg hover:bg-[#EDE3D3] transition font-medium"
+  >
+    Notes Oversight
+  </Link>
 
-              </nav>
+  <Link
+    href="/hr"
+    className="block px-4 py-2 rounded-lg hover:bg-[#EDE3D3] transition font-medium"
+  >
+    HR Portal
+  </Link>
+
+</nav>
             </div>
 
             <div className="text-xs text-[#9C8F7A]">
