@@ -13,30 +13,33 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-[#F6F1E8] text-[#2E2A26]">
+      <body className="bg-gradient-to-br from-[#F6F1E8] via-[#EFE6D8] to-[#E8DCCA] text-[#2E2A26]">
 
         <div className="min-h-screen flex">
 
           {/* Sidebar */}
-          <aside className="w-64 bg-white shadow-md p-6 flex flex-col justify-between">
+          <aside className="w-64 bg-white/80 backdrop-blur-md border-r border-[#E2D6C5] shadow-lg p-6 flex flex-col justify-between">
 
             <div>
-              <h1 className="text-xl font-semibold mb-8 tracking-wide">
-                Vantive
-              </h1>
+              <div className="flex items-center gap-2 mb-10">
+                <div className="w-3 h-8 bg-[#6B8E6B] rounded-full" />
+                <h1 className="text-xl font-semibold tracking-wide">
+                  Vantive
+                </h1>
+              </div>
 
-              <nav className="space-y-4">
+              <nav className="space-y-3">
 
                 <Link
                   href="/dashboard"
-                  className="block px-4 py-2 rounded-lg hover:bg-[#EDE6DA] transition"
+                  className="block px-4 py-2 rounded-lg hover:bg-[#EDE3D3] transition font-medium"
                 >
                   Control Center
                 </Link>
 
                 <Link
                   href="/notes"
-                  className="block px-4 py-2 rounded-lg hover:bg-[#EDE6DA] transition"
+                  className="block px-4 py-2 rounded-lg hover:bg-[#EDE3D3] transition font-medium"
                 >
                   Notes Oversight
                 </Link>
@@ -44,15 +47,17 @@ export default function RootLayout({
               </nav>
             </div>
 
-            <div className="text-xs text-gray-400">
+            <div className="text-xs text-[#9C8F7A]">
               Elevate Health & Wellness
             </div>
 
           </aside>
 
           {/* Main Content */}
-          <main className="flex-1 p-10">
-            {children}
+          <main className="flex-1 p-12">
+            <div className="bg-white/70 backdrop-blur-md rounded-2xl shadow-xl border border-[#E5D9C7] p-10 min-h-[80vh]">
+              {children}
+            </div>
           </main>
 
         </div>
