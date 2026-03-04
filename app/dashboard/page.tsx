@@ -5,7 +5,11 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-export default async function Dashboard() {
+export default async function Dashboard({
+  searchParams,
+}: {
+  searchParams: { practitioner?: string }
+}) {
   const { data: appointments } = await supabase
     .from("appointments")
     .select("*")
@@ -13,28 +17,46 @@ export default async function Dashboard() {
 
   const now = new Date()
 
-  const enriched = (appointments || []).map((appt) => {
-    const scheduled = new Date(appt.scheduled_start)
-    const isOverdue =
-      !appt.note_completed && scheduled < now
-    const isToday =
-      scheduled.toDateString() === now.toDateString()
+  const enriched =
+    (appointments || []).map((appt) => {
+      const scheduled = new Date(appt.scheduled_start)
 
-    return {
-      ...appt,
-      scheduled,
-      isOverdue,
-      isToday,
-    }
-  })
+      const isOverdue =
+        !appt.note_completed && scheduled < now
+
+      const isToday =
+        scheduled.toDateString() === now.toDateString()
+
+      return {
+        ...appt,
+        scheduled,
+        isOverdue,
+        isToday,
+      }
+    }) || []
+
+  const selectedPractitioner = searchParams?.practitioner
+
+  const filteredAppointments = selectedPractitioner
+    ? enriched.filter(
+        (a) => a.practitioner_name === selectedPractitioner
+      )
+    : enriched
 
   // ---- GLOBAL STATS ----
   const overdueCount = enriched.filter((a) => a.isOverdue).length
-  const todayCount = enriched.filter((a) => a.isToday && !a.note_completed).length
-  const completedCount = enriched.filter((a) => a.note_completed).length
+  const todayCount = enriched.filter(
+    (a) => a.isToday && !a.note_completed
+  ).length
+  const completedCount = enriched.filter(
+    (a) => a.note_completed
+  ).length
+
   const completionRate =
     enriched.length > 0
-      ? Math.round((completedCount / enriched.length) * 100)
+      ? Math.round(
+          (completedCount / enriched.length) * 100
+        )
       : 0
 
   // ---- GROUP BY PRACTITIONER ----
@@ -50,7 +72,7 @@ export default async function Dashboard() {
   const practitioners = Object.entries(grouped)
 
   // ---- WORK QUEUE SORT ----
-  const workQueue = enriched.sort((a, b) => {
+  const workQueue = filteredAppointments.sort((a, b) => {
     if (a.isOverdue && !b.isOverdue) return -1
     if (!a.isOverdue && b.isOverdue) return 1
     return a.scheduled.getTime() - b.scheduled.getTime()
@@ -79,50 +101,75 @@ export default async function Dashboard() {
         </div>
 
         {/* Practitioner Grid */}
-        <div>
-          <h2 className="text-xl font-semibold mb-4">
-            Practitioner Accountability
-          </h2>
+        {!selectedPractitioner && (
+          <div>
+            <h2 className="text-xl font-semibold mb-4">
+              Practitioner Accountability
+            </h2>
 
-          <div className="grid grid-cols-3 gap-6">
-            {practitioners.map(([name, appts]: any) => {
-              const overdue = appts.filter((a: any) => a.isOverdue).length
-              const today = appts.filter((a: any) => a.isToday && !a.note_completed).length
-              const completed = appts.filter((a: any) => a.note_completed).length
+            <div className="grid grid-cols-3 gap-6">
+              {practitioners.map(([name, appts]: any) => {
+                const overdue = appts.filter((a: any) => a.isOverdue).length
+                const today = appts.filter(
+                  (a: any) =>
+                    a.isToday && !a.note_completed
+                ).length
+                const completed = appts.filter(
+                  (a: any) => a.note_completed
+                ).length
 
-              return (
-                <div
-                  key={name}
-                  className={`bg-white p-5 rounded-xl shadow-sm border ${
-                    overdue > 0 ? "border-red-400" : "border-gray-200"
-                  }`}
-                >
-                  <h3 className="font-semibold text-lg mb-3">
-                    {name}
-                  </h3>
+                return (
+                  <a
+                    key={name}
+                    href={`/dashboard?practitioner=${encodeURIComponent(
+                      name as string
+                    )}`}
+                    className={`block bg-white p-5 rounded-xl shadow-sm border transition hover:shadow-md ${
+                      overdue > 0
+                        ? "border-red-400"
+                        : "border-gray-200"
+                    }`}
+                  >
+                    <h3 className="font-semibold text-lg mb-3">
+                      {name}
+                    </h3>
 
-                  <div className="space-y-1 text-sm">
-                    <p className="text-red-600">
-                      {overdue} Overdue
-                    </p>
-                    <p className="text-yellow-600">
-                      {today} Today
-                    </p>
-                    <p className="text-green-600">
-                      {completed} Completed
-                    </p>
-                  </div>
-                </div>
-              )
-            })}
+                    <div className="space-y-1 text-sm">
+                      <p className="text-red-600">
+                        {overdue} Overdue
+                      </p>
+                      <p className="text-yellow-600">
+                        {today} Today
+                      </p>
+                      <p className="text-green-600">
+                        {completed} Completed
+                      </p>
+                    </div>
+                  </a>
+                )
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Work Queue */}
         <div>
           <h2 className="text-xl font-semibold mb-4">
-            Work Queue
+            {selectedPractitioner
+              ? `${selectedPractitioner}'s Work Queue`
+              : "Work Queue"}
           </h2>
+
+          {selectedPractitioner && (
+            <div className="mb-4">
+              <a
+                href="/dashboard"
+                className="text-sm text-blue-600 hover:underline"
+              >
+                ← Back to All Practitioners
+              </a>
+            </div>
+          )}
 
           <div className="space-y-4">
             {workQueue.map((appt: any) => (
@@ -151,6 +198,7 @@ export default async function Dashboard() {
                     <p className="text-sm">
                       {appt.scheduled.toLocaleTimeString()}
                     </p>
+
                     {appt.note_completed ? (
                       <span className="text-green-600 text-sm font-semibold">
                         Completed
@@ -185,7 +233,10 @@ function StatCard({
   value: any
   color?: "red" | "yellow" | "green"
 }) {
-  const colorMap: Record<"red" | "yellow" | "green", string> = {
+  const colorMap: Record<
+    "red" | "yellow" | "green",
+    string
+  > = {
     red: "text-red-600",
     yellow: "text-yellow-600",
     green: "text-green-600",
@@ -193,7 +244,9 @@ function StatCard({
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-      <p className="text-sm text-gray-500">{label}</p>
+      <p className="text-sm text-gray-500">
+        {label}
+      </p>
       <p
         className={`text-2xl font-semibold ${
           color ? colorMap[color] : ""
