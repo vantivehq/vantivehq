@@ -67,10 +67,7 @@ export default function StaffProfilePage() {
     alert("Saved")
   }
 
-  const uploadDocument = async (
-    file: File,
-    type: string
-  ) => {
+  const uploadDocument = async (file: File, type: string) => {
     const filePath = `${id}/${type}-${Date.now()}`
 
     const { error: uploadError } = await supabase.storage
@@ -104,7 +101,7 @@ export default function StaffProfilePage() {
         {staff.name}
       </h1>
 
-      {/* PROFILE INFO */}
+      {/* STAFF INFO */}
 
       <div className="bg-white p-8 rounded-xl shadow-sm border space-y-6">
 
@@ -161,7 +158,7 @@ export default function StaffProfilePage() {
 
         <button
           onClick={saveChanges}
-          className="bg-[#6B8E6B] text-white px-6 py-2 rounded-lg shadow"
+          className="bg-[#6B8E6B] text-white px-6 py-2 rounded-lg shadow hover:opacity-90"
         >
           {saving ? "Saving..." : "Save Changes"}
         </button>
@@ -177,17 +174,53 @@ export default function StaffProfilePage() {
         </h2>
 
         {documentTypes.map((type) => {
+
           const doc = documents.find(
             (d) => d.document_type === type
           )
 
+          const getStatus = () => {
+            if (!doc)
+              return { label: "Missing", color: "text-red-600" }
+
+            if (!doc.expiration_date)
+              return { label: "Uploaded", color: "text-green-600" }
+
+            const exp = new Date(doc.expiration_date)
+            const today = new Date()
+
+            const diff =
+              (exp.getTime() - today.getTime()) /
+              (1000 * 60 * 60 * 24)
+
+            if (diff < 0)
+              return { label: "Expired", color: "text-red-600" }
+
+            if (diff < 30)
+              return {
+                label: "Expiring Soon",
+                color: "text-yellow-600",
+              }
+
+            return { label: "Uploaded", color: "text-green-600" }
+          }
+
+          const status = getStatus()
+
           return (
             <div
               key={type}
-              className="flex items-center justify-between border-b pb-3"
+              className="flex items-center justify-between border-b pb-4"
             >
               <div>
-                <p className="font-medium">{type}</p>
+
+                <p className="font-medium">
+                  {type}
+                </p>
+
+                <p className={`text-sm ${status.color}`}>
+                  {status.label}
+                </p>
 
                 {doc && (
                   <a
@@ -198,23 +231,28 @@ export default function StaffProfilePage() {
                     View Document
                   </a>
                 )}
+
               </div>
 
-           <label className="cursor-pointer bg-[#6B8E6B] text-white px-4 py-2 rounded-lg shadow hover:opacity-90">
-  Upload
-  <input
-    type="file"
-    className="hidden"
-    onChange={(e) => {
-      const file = e.target.files?.[0]
-      if (file) uploadDocument(file, type)
-    }}
-  />
-</label>
+              <label className="cursor-pointer bg-[#6B8E6B] text-white px-4 py-2 rounded-lg shadow hover:opacity-90">
+
+                {doc ? "Replace" : "Upload"}
+
+                <input
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) uploadDocument(file, type)
+                  }}
+                />
+
+              </label>
             </div>
           )
         })}
       </div>
+
     </div>
   )
 }
