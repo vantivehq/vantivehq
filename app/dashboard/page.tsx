@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic"
 
 import { createClient } from "@supabase/supabase-js"
+import Link from "next/link"
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -121,7 +122,7 @@ export default async function Dashboard({
                 ).length
 
                 return (
-                  <a
+                  <Link
                     key={name}
                     href={`/dashboard?practitioner=${encodeURIComponent(
                       name as string
@@ -147,7 +148,7 @@ export default async function Dashboard({
                         {completed} Completed
                       </p>
                     </div>
-                  </a>
+                  </Link>
                 )
               })}
             </div>
@@ -164,12 +165,12 @@ export default async function Dashboard({
 
           {selectedPractitioner && (
             <div className="mb-4">
-              <a
+              <Link
                 href="/dashboard"
                 className="text-sm text-blue-600 hover:underline"
               >
                 ← Back to All Practitioners
-              </a>
+              </Link>
             </div>
           )}
 
