@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { createClient } from "@supabase/supabase-js"
 
 const supabase = createClient(
@@ -21,47 +21,79 @@ type Appointment = {
 
 export default function NotesPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [selectedPractitioner, setSelectedPractitioner] = useState<string | null>(null)
+  const [selectedPractitioner, setSelectedPractitioner] = useState<string>("")
+  const [selectedService, setSelectedService] = useState<string>("")
+  const [search, setSearch] = useState<string>("")
+  const [startDate, setStartDate] = useState<string>("")
+  const [endDate, setEndDate] = useState<string>("")
 
   useEffect(() => {
     const fetchAppointments = async () => {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("appointments")
         .select("*")
         .order("scheduled_start", { ascending: true })
 
-      if (!error && data) {
-        setAppointments(data as Appointment[])
-      }
+      if (data) setAppointments(data as Appointment[])
     }
 
     fetchAppointments()
   }, [])
 
   const now = new Date()
-  const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000)
-  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
 
-  const enriched = appointments.map((appt) => {
-    const scheduled = new Date(appt.scheduled_start)
+  const enriched = useMemo(() => {
+    return appointments.map((appt) => {
+      const scheduled = new Date(appt.scheduled_start)
+      const diffMs = now.getTime() - scheduled.getTime()
+      const hoursOverdue =
+        diffMs > 0 ? Math.floor(diffMs / (1000 * 60 * 60)) : 0
 
-    let urgency: Urgency = "future"
+      let urgency: Urgency = "future"
 
-    if (appt.note_completed) {
-      urgency = "completed"
-    } else if (scheduled < twentyFourHoursAgo) {
-      urgency = "critical"
-    } else if (scheduled < twelveHoursAgo) {
-      urgency = "high"
-    } else if (scheduled.toDateString() === now.toDateString()) {
-      urgency = "medium"
-    }
+      if (appt.note_completed) urgency = "completed"
+      else if (hoursOverdue >= 24) urgency = "critical"
+      else if (hoursOverdue >= 12) urgency = "high"
+      else if (scheduled.toDateString() === now.toDateString())
+        urgency = "medium"
 
-    return {
-      ...appt,
-      scheduled,
-      urgency,
-    }
+      return {
+        ...appt,
+        scheduled,
+        urgency,
+        hoursOverdue,
+      }
+    })
+  }, [appointments])
+
+  const practitioners = Array.from(
+    new Set(enriched.map((a) => a.practitioner_name || "Unknown"))
+  )
+
+  const services = Array.from(
+    new Set(enriched.map((a) => a.service_name || "Unknown"))
+  )
+
+  const filtered = enriched.filter((appt) => {
+    if (selectedPractitioner && appt.practitioner_name !== selectedPractitioner)
+      return false
+
+    if (selectedService && appt.service_name !== selectedService)
+      return false
+
+    if (
+      search &&
+      !appt.client_name?.toLowerCase().includes(search.toLowerCase())
+    )
+      return false
+
+    if (startDate && new Date(appt.scheduled_start) < new Date(startDate))
+      return false
+
+    if (endDate && new Date(appt.scheduled_start) > new Date(endDate))
+      return false
+
+    return true
   })
 
   const urgencyRank: Record<Urgency, number> = {
@@ -72,6 +104,12 @@ export default function NotesPage() {
     completed: 5,
   }
 
+  const sorted = [...filtered].sort(
+    (a, b) =>
+      urgencyRank[a.urgency] - urgencyRank[b.urgency] ||
+      b.hoursOverdue - a.hoursOverdue
+  )
+
   const urgencyStyles: Record<Urgency, string> = {
     critical: "border-red-500 bg-red-50 text-red-700",
     high: "border-orange-400 bg-orange-50 text-orange-700",
@@ -80,159 +118,91 @@ export default function NotesPage() {
     completed: "border-green-400 bg-green-50 text-green-700",
   }
 
-  const filtered = selectedPractitioner
-    ? enriched.filter(
-        (a) => a.practitioner_name === selectedPractitioner
-      )
-    : enriched
-
-  const sorted = [...filtered].sort(
-    (a, b) =>
-      urgencyRank[a.urgency] - urgencyRank[b.urgency] ||
-      a.scheduled.getTime() - b.scheduled.getTime()
-  )
-
-  const grouped: Record<string, typeof enriched> = {}
-
-  enriched.forEach((appt) => {
-    const name = appt.practitioner_name || "Unknown"
-    if (!grouped[name]) grouped[name] = []
-    grouped[name].push(appt)
-  })
-
-  const practitioners = Object.entries(grouped)
-
-  const criticalCount = enriched.filter((a) => a.urgency === "critical").length
-  const highCount = enriched.filter((a) => a.urgency === "high").length
-  const mediumCount = enriched.filter((a) => a.urgency === "medium").length
-  const completedCount = enriched.filter((a) => a.urgency === "completed").length
-
   return (
-    <main className="min-h-screen bg-gray-100 p-10">
-      <div className="max-w-6xl mx-auto space-y-10">
+    <div className="space-y-8">
 
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-semibold">Notes Oversight</h1>
-          <p className="text-gray-500">{now.toLocaleDateString()}</p>
-        </div>
+      <h1 className="text-3xl font-semibold">Notes Oversight</h1>
 
-        <div className="grid grid-cols-4 gap-6">
-          <StatCard label="24hr+ Critical" value={criticalCount} color="red" />
-          <StatCard label="12–24hr High" value={highCount} color="orange" />
-          <StatCard label="Today Pending" value={mediumCount} color="yellow" />
-          <StatCard label="Completed" value={completedCount} color="green" />
-        </div>
+      {/* FILTER BAR */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border grid grid-cols-5 gap-4">
 
-        {!selectedPractitioner && (
-          <div>
-            <h2 className="text-xl font-semibold mb-4">
-              Practitioner Accountability
-            </h2>
+        <input
+          type="text"
+          placeholder="Search client..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="border rounded px-3 py-2"
+        />
 
-            <div className="grid grid-cols-3 gap-6">
-              {practitioners.map(([name, appts]) => {
-                const critical = appts.filter((a) => a.urgency === "critical").length
-                const high = appts.filter((a) => a.urgency === "high").length
+        <select
+          value={selectedPractitioner}
+          onChange={(e) => setSelectedPractitioner(e.target.value)}
+          className="border rounded px-3 py-2"
+        >
+          <option value="">All Practitioners</option>
+          {practitioners.map((p) => (
+            <option key={p}>{p}</option>
+          ))}
+        </select>
 
-                return (
-                  <div
-                    key={name}
-                    onClick={() => setSelectedPractitioner(name)}
-                    className={`cursor-pointer bg-white p-5 rounded-xl shadow-sm border transition hover:shadow-md ${
-                      critical > 0
-                        ? "border-red-500"
-                        : high > 0
-                        ? "border-orange-400"
-                        : "border-gray-200"
-                    }`}
-                  >
-                    <h3 className="font-semibold text-lg mb-3">{name}</h3>
-                    <p className="text-sm text-red-600">{critical} Critical</p>
-                    <p className="text-sm text-orange-600">{high} High</p>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
+        <select
+          value={selectedService}
+          onChange={(e) => setSelectedService(e.target.value)}
+          className="border rounded px-3 py-2"
+        >
+          <option value="">All Services</option>
+          {services.map((s) => (
+            <option key={s}>{s}</option>
+          ))}
+        </select>
 
-        <div>
-          <h2 className="text-xl font-semibold mb-4">
-            {selectedPractitioner
-              ? `${selectedPractitioner}'s Work Queue`
-              : "Work Queue"}
-          </h2>
+        <input
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+          className="border rounded px-3 py-2"
+        />
 
-          {selectedPractitioner && (
-            <div className="mb-4">
-              <button
-                onClick={() => setSelectedPractitioner(null)}
-                className="text-sm text-blue-600 hover:underline"
-              >
-                ← Back to All Practitioners
-              </button>
-            </div>
-          )}
-
-          <div className="space-y-4">
-            {sorted.map((appt) => (
-              <div
-                key={appt.id}
-                className={`p-5 rounded-xl shadow-sm border ${
-                  urgencyStyles[appt.urgency]
-                }`}
-              >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-semibold">
-                      {appt.service_name || "Unknown Service"}
-                    </p>
-                    <p className="text-sm">
-                      {appt.client_name || "Unknown Client"}
-                    </p>
-                    <p className="text-xs">
-                      {appt.practitioner_name || "Unknown"}
-                    </p>
-                  </div>
-                  <div className="text-right text-sm font-semibold">
-                    {appt.urgency.toUpperCase()}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <input
+          type="date"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+          className="border rounded px-3 py-2"
+        />
 
       </div>
-    </main>
-  )
-}
 
-function StatCard({
-  label,
-  value,
-  color,
-}: {
-  label: string
-  value: number
-  color: "red" | "orange" | "yellow" | "green"
-}) {
-  const colorMap: Record<
-    "red" | "orange" | "yellow" | "green",
-    string
-  > = {
-    red: "text-red-600",
-    orange: "text-orange-600",
-    yellow: "text-yellow-600",
-    green: "text-green-600",
-  }
+      {/* RESULTS */}
+      <div className="space-y-4">
+        {sorted.map((appt) => (
+          <div
+            key={appt.id}
+            className={`p-5 rounded-xl shadow-sm border ${
+              urgencyStyles[appt.urgency]
+            }`}
+          >
+            <div className="flex justify-between">
+              <div>
+                <p className="font-semibold">
+                  {appt.service_name || "Unknown Service"}
+                </p>
+                <p className="text-sm">
+                  {appt.client_name || "Unknown Client"}
+                </p>
+                <p className="text-xs">
+                  {appt.practitioner_name || "Unknown"}
+                </p>
+              </div>
 
-  return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-      <p className="text-sm text-gray-500">{label}</p>
-      <p className={`text-2xl font-semibold ${colorMap[color]}`}>
-        {value}
-      </p>
+              <div className="text-sm font-semibold">
+                {!appt.note_completed && appt.hoursOverdue > 0
+                  ? `${appt.hoursOverdue}h overdue`
+                  : appt.urgency.toUpperCase()}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
